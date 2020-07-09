@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import { Grid, Form, Segment, Button, Header, Message, Icon } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import firebase from '../../firebase';
+import md5 from 'md5';
 
 class Register extends Component {
   state = {
@@ -11,6 +12,7 @@ class Register extends Component {
     passwordConfirmation: '',
     errors: [],
     loading: false,
+    usersRef: firebase.database().ref('users'),
   };
 
   isFormValid = () => {
@@ -60,7 +62,20 @@ class Register extends Component {
         .createUserWithEmailAndPassword(this.state.email, this.state.password)
         .then(createdUser => {
           console.log(createdUser);
-          this.setState({ loading: false });
+          createdUser.user.updateProfile({
+            displayName: this.state.username,
+            photoURL: `http://gravatar.com/avatar/${md5(createdUser.user.email)}?d=identicon`,
+          })
+          .then(() => {
+            this.saveUser(createdUser).then(() => {
+              console.log('user saved');
+            })
+          })
+          .catch(err => {
+            console.error(err);
+            this.setState({ errors: this.state.errors.concat(err), loading: false });
+          })
+          // this.setState({ loading: false });
         })
         .catch(err => {
           console.error(err);
@@ -70,6 +85,13 @@ class Register extends Component {
           });
         })
     }
+  }
+
+  saveUser = createdUser => {
+    return this.state.usersRef.child(createdUser.user.uid).set({
+      name: createdUser.user.displayName,
+      avatar: createdUser.user.photoURL,
+    });
   }
 
   handleInputError = (errors, inputName) => {
@@ -86,7 +108,7 @@ class Register extends Component {
     return (
       <Grid className="app" textAlign="center" verticalAlign="middle">
         <Grid.Column style={{ maxWidth: 450 }}>
-          <Header as="h2" icon color="orange" textAlign="center">
+          <Header as="h1" icon color="orange" textAlign="center">
             <Icon name="puzzle piece" color="orange" />
             Register for ConvoChat 9000
           </Header>
@@ -99,7 +121,7 @@ class Register extends Component {
               <Form.Input className={this.handleInputError(errors, 'password')} value={passwordConfirmation} fluid name="passwordConfirmation" icon="repeat" iconPosition="left" placeholder="Password Confirmation" onChange={this.handleChange} type="password" />
               <Button disabled={loading} className={loading ? 'loading' : ''} color="orange" fluid size="large">Submit</Button>
             </Segment>
-            <Message>Alread a user? <Link to="/login">Login</Link></Message>
+            <Message>Already have an account? <Link to="/login">Log in here.</Link></Message>
           </Form>
           {errors.length > 0 && (
             <Message error>
